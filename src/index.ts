@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import Fastify, { FastifyInstance } from "fastify";
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -40,6 +41,7 @@ interface ChartConfig {
 
 class QuickChartServer {
   private server: Server;
+  private fastify: FastifyInstance;
 
   constructor() {
     this.server = new Server(
@@ -53,6 +55,33 @@ class QuickChartServer {
         },
       }
     );
+
+    this.fastify = Fastify({
+      requestTimeout: 0,
+      keepAliveTimeout: 0,
+      connectionTimeout: 0,
+      disableRequestLogging: true,
+      logger: {
+        level: "debug",
+        transport: {
+          target: "pino-pretty", // 使用 pino-pretty 格式化输出
+          options: {
+            colorize: true, // 彩色输出
+            translateTime: true, // 显示时间
+            ignore: "pid,hostname,reqId", // 忽略特定字段
+          },
+        },
+      },
+    });
+
+    this.fastify.register(import('fastify-raw-body'), {
+      field: 'rawBody', // change the default request.rawBody property name
+      global: true, // add the rawBody to every request. **Default true**
+      encoding: false, // set it to false to set rawBody as a Buffer **Default utf8**
+      runFirst: false, // get the body before any preParsing hook change/uncompress it. **Default false**
+      routes: [], // array of routes, **`global`** will be ignored, wildcard routes not supported
+      jsonContentTypes: [], // array of content-types to handle as JSON. **Default ['application/json']**
+    })
 
     this.setupToolHandlers();
     
@@ -143,9 +172,8 @@ class QuickChartServer {
 
   private async generateChartUrl(config: ChartConfig): Promise<string> {
     const encodedConfig = encodeURIComponent(JSON.stringify(config));
-    return `${QUICKCHART_BASE_URL}?c=${encodedConfig}`;
+    return `${QUICKCHART_BASE_URL}?width=685&height=411&c=${encodedConfig}`;
   }
-
   private setupToolHandlers() {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
@@ -282,9 +310,36 @@ class QuickChartServer {
   }
 
   async run() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    console.error('QuickChart MCP server running on stdio');
+    const transports: {[sessionId: string]: SSEServerTransport} = {};
+    this.fastify.get("/sse", async (_, reply) => {
+      this.fastify.log.debug("sse");
+      const transport = new SSEServerTransport('/messages', reply.raw);
+      transports[transport.sessionId] = transport;
+      reply.raw.on("close", () => {
+        delete transports[transport.sessionId];
+      });
+      await this.server.connect(transport);
+    });
+
+    this.fastify.post("/messages", async (request, reply) => {
+      this.fastify.log.debug("message");
+      const query = request.query as { sessionId: string };
+      const sessionId = query.sessionId;
+      const transport = transports[sessionId];
+      if (transport) {
+        await transport.handlePostMessage(request.raw, reply.raw, request.body);
+      } else {
+        return reply.status(400).send('No transport found for sessionId');
+      }
+    });
+
+    this.fastify.listen(
+      { port: 8000, host: "0.0.0.0" },
+      (error) => {
+        if (error) return error;
+        this.fastify.log.info("quickchart/mcp server start success !");
+      }
+    );
   }
 }
 

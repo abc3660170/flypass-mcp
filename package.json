@@ -1,5 +1,5 @@
 {
-  "name": "@gongrzhe/quickchart-mcp-server",
+  "name": "@fee/quickchart-mcp-server",
   "version": "1.0.3",
   "description": "A Model Context Protocol server for generating charts using QuickChart.io",
   "type": "module",
@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node build/index.js",
+    "dev": "nodemon --watch \"src/**/*.ts\" --exec node \"--import=./register-loader.js\" \"./src/index.ts\"",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build"
   },
@@ -23,13 +24,8 @@
     "chart",
     "data-visualization"
   ],
-  "author": "gongrzhe",
+  "author": "tchen",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/GongRzhe/Quickchart-MCP-Server"
-  },
-  "homepage": "https://github.com/GongRzhe/Quickchart-MCP-Server#readme",
   "publishConfig": {
     "access": "public"
   },
@@ -37,11 +33,16 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^0.6.0",
-    "axios": "^1.7.9"
+    "@modelcontextprotocol/sdk": "^1.10.0",
+    "axios": "^1.7.9",
+    "fastify": "^5.3.0",
+    "fastify-raw-body": "^5.0.0",
+    "pino-pretty": "^13.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
+    "nodemon": "^3.1.9",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }
 }
