@@ -14,7 +14,7 @@ const extenalQuickchart = process.env.QUICKCHART;
 const masterIP = process.env.MASTER_IP;
 const defaultQuickchartPort = 14166;
 const flypassMCPQuickchartPort = 14167;
-const QUICKCHART_BASE_URL = extenalQuickchart ? `${extenalQuickchart}/chart` : `http://${masterIP}:${defaultQuickchartPort}`;
+const QUICKCHART_BASE_URL = extenalQuickchart ? `${extenalQuickchart}/chart` : `http://${masterIP}:${defaultQuickchartPort}/chart`;
 interface ChartConfig {
   type: string;
   data: {
