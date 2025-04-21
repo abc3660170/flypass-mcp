@@ -10,8 +10,11 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import axios from 'axios';
 
-const QUICKCHART_BASE_URL = 'https://quickchart.io/chart';
-
+const extenalQuickchart = process.env.QUICKCHART;
+const masterIP = process.env.MASTER_IP;
+const defaultQuickchartPort = 14166;
+const flypassMCPQuickchartPort = 14167;
+const QUICKCHART_BASE_URL = extenalQuickchart ? `${extenalQuickchart}/chart` : `http://${masterIP}:${defaultQuickchartPort}`;
 interface ChartConfig {
   type: string;
   data: {
@@ -84,7 +87,7 @@ class QuickChartServer {
     })
 
     this.setupToolHandlers();
-    
+
     this.server.onerror = (error) => console.error('[MCP Error]', error);
     process.on('SIGINT', async () => {
       await this.server.close();
@@ -107,7 +110,7 @@ class QuickChartServer {
 
   private generateChartConfig(args: any): ChartConfig {
     const { type, labels, datasets, title, options = {} } = args;
-    
+
     this.validateChartType(type);
 
     const config: ChartConfig = {
@@ -199,7 +202,7 @@ class QuickChartServer {
                   properties: {
                     label: { type: 'string' },
                     data: { type: 'array' },
-                    backgroundColor: { 
+                    backgroundColor: {
                       oneOf: [
                         { type: 'string' },
                         { type: 'array', items: { type: 'string' } }
@@ -270,17 +273,17 @@ class QuickChartServer {
 
         case 'download_chart': {
           try {
-            const { config, outputPath } = request.params.arguments as { 
+            const { config, outputPath } = request.params.arguments as {
               config: Record<string, unknown>;
               outputPath: string;
             };
             const chartConfig = this.generateChartConfig(config);
             const url = await this.generateChartUrl(chartConfig);
-            
+
             const response = await axios.get(url, { responseType: 'arraybuffer' });
             const fs = await import('fs');
             await fs.promises.writeFile(outputPath, response.data);
-            
+
             return {
               content: [
                 {
@@ -310,7 +313,7 @@ class QuickChartServer {
   }
 
   async run() {
-    const transports: {[sessionId: string]: SSEServerTransport} = {};
+    const transports: { [sessionId: string]: SSEServerTransport } = {};
     this.fastify.get("/sse", async (_, reply) => {
       this.fastify.log.debug("sse");
       const transport = new SSEServerTransport('/messages', reply.raw);
@@ -334,7 +337,7 @@ class QuickChartServer {
     });
 
     this.fastify.listen(
-      { port: 8000, host: "0.0.0.0" },
+      { port: flypassMCPQuickchartPort, host: "0.0.0.0" },
       (error) => {
         if (error) return error;
         this.fastify.log.info("quickchart/mcp server start success !");
